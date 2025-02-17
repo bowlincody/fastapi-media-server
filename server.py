@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.routing import APIRoute
 import os
 import boto3
 
