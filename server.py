@@ -126,3 +126,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/debug/routes")
+async def get_routes():
+    return {
+        "routes": [
+            {"path": route.path, "methods": list(route.methods)}
+            for route in app.routes
+            if isinstance(route, APIRoute)
+        ]
+    }
