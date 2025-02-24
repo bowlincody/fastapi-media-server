@@ -4,7 +4,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 import os
 import boto3
-import paho.mqtt.client as mqtt
 
 app = FastAPI()
 
@@ -19,12 +18,6 @@ AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-2")
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "media-uploader-dev-us-east-microlumix-001")
 
-# MQTT Configuration
-MQTT_BROKER = "localhost"  # Update with actual broker address
-MQTT_PORT = 1883
-MQTT_TOPIC_PLAY = "video/play"
-MQTT_TOPIC_DELETE = "video/delete"
-
 # Create S3 Client
 if not AWS_ACCESS_KEY_ID or not AWS_SECRET_ACCESS_KEY:
     raise RuntimeError("AWS credentials are missing! Check environment variables.")
@@ -36,10 +29,6 @@ s3_client = boto3.client(
     aws_secret_access_key=AWS_SECRET_ACCESS_KEY
 )
 
-# Setup MQTT Client
-mqtt_client = mqtt.Client()
-mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
-mqtt_client.loop_start()
 
 clients = []  # List of connected WebSocket clients
 
@@ -47,21 +36,17 @@ clients = []  # List of connected WebSocket clients
 # Upload a media file (Local Storage)
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    """ Uploads a file to local storage, notifies clients via WebSocket, and publishes to MQTT """
+    """ Uploads a file to local storage and notifies clients via WebSocket """
     file_path = os.path.join(UPLOAD_FOLDER, file.filename)
     
     # Stream file to avoid memory overload
     with open(file_path, "wb") as buffer:
-        for chunk in iter(lambda: file.file.read(1024 * 1024), b""):  # Read 1MB at a time
+        for chunk in iter(lambda: file.file.read(1024 * 1024), b""): # Read 1MB at a time
             buffer.write(chunk)
 
     # Notify all connected WebSocket clients about the new file
     for client in clients:
         await client.send_json({"message": "new_file", "filename": file.filename})
-
-    # Publish to MQTT topic
-    mqtt_client.publish(MQTT_TOPIC_PLAY, file.filename)
-    print(f"MQTT message published to {MQTT_TOPIC_PLAY}: {file.filename}")
 
     return {"message": "File uploaded successfully", "filename": file.filename}
 
@@ -81,7 +66,7 @@ def generate_presigned_url(file_name: str = Query(..., description="Name of the 
             ExpiresIn=3600  # URL expires in 1 hour
         )
     except Exception as e:
-        print(f"Error generating pre-signed URL: {e}")  # Logs error
+        print(f"Error generating pre-signed URL: {e}") # Logs error
         raise HTTPException(status_code=500, detail="Could not generate upload URL. Please try again later.")
 
     return JSONResponse(content=presigned_post)
@@ -103,9 +88,9 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             await websocket.receive_text()  # Keep connection open
     except Exception as e:
-        print(f"WebSocket disconnected: {e}")  # Log the error
+        print(f"WebSocket disconnected: {e}") # Log the error
     finally:
-        clients.remove(websocket)  # Ensure client is removed when they disconnect
+        clients.remove(websocket) # Ensure client is removed when they disconnect
 
 
 # Download a media file (Local Storage)
@@ -131,11 +116,6 @@ def delete_file(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
 
     os.remove(file_path)
-
-    # Publish delete event to MQTT
-    mqtt_client.publish(MQTT_TOPIC_DELETE, filename)
-    print(f"MQTT message published to {MQTT_TOPIC_DELETE}: {filename}")
-
     return {"message": "File deleted successfully", "filename": filename}
 
 
@@ -147,7 +127,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 @app.get("/debug/routes")
 async def get_routes():
