@@ -9,3 +9,4 @@ six
 urllib3
 websockets
 python-multipart
+paho-mqtt
