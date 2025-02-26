@@ -20,7 +20,7 @@ AWS_REGION = os.environ.get("AWS_REGION", "us-east-2")
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "media-uploader-dev-us-east-microlumix-001")
 
 # MQTT Configuration
-MQTT_BROKER = "localhost"  # Update with actual broker address
+MQTT_BROKER = "18.227.89.10"  # Update with actual broker address
 MQTT_PORT = 1883
 MQTT_TOPIC_PLAY = "video/play"
 MQTT_TOPIC_DELETE = "video/delete"
@@ -36,32 +36,36 @@ s3_client = boto3.client(
     aws_secret_access_key=AWS_SECRET_ACCESS_KEY
 )
 
-# Setup MQTT Client
+# Setup MQTT Client with connection callback
+def on_connect(client, userdata, flags, rc):
+    if rc == 0:
+        print("Connected to MQTT Broker!")
+    else:
+        print(f"Failed to connect, return code {rc}")
+
 mqtt_client = mqtt.Client()
+mqtt_client.on_connect = on_connect
 mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
 mqtt_client.loop_start()
-
-clients = []  # List of connected WebSocket clients
 
 
 # Upload a media file (Local Storage)
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    """ Uploads a file to local storage, notifies clients via WebSocket, and publishes to MQTT """
+    """ Uploads a file to local storage and publishes to MQTT """
     file_path = os.path.join(UPLOAD_FOLDER, file.filename)
     
-    # Stream file to avoid memory overload
     with open(file_path, "wb") as buffer:
-        for chunk in iter(lambda: file.file.read(1024 * 1024), b""):  # Read 1MB at a time
+        for chunk in iter(lambda: file.file.read(1024 * 1024), b""):
             buffer.write(chunk)
 
-    # Notify all connected WebSocket clients about the new file
-    for client in clients:
-        await client.send_json({"message": "new_file", "filename": file.filename})
-
-    # Publish to MQTT topic
-    mqtt_client.publish(MQTT_TOPIC_PLAY, file.filename)
-    print(f"MQTT message published to {MQTT_TOPIC_PLAY}: {file.filename}")
+    public_file_url = f"http://{MQTT_BROKER}:8000/media/{file.filename}"
+    
+    if mqtt_client.is_connected():
+        mqtt_client.publish(MQTT_TOPIC_PLAY, public_file_url)
+        print(f"MQTT message published to {MQTT_TOPIC_PLAY}: {public_file_url}")
+    else:
+        print("MQTT client is not connected!")
 
     return {"message": "File uploaded successfully", "filename": file.filename}
 
