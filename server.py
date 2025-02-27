@@ -48,7 +48,6 @@ mqtt_client.on_connect = on_connect
 mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
 mqtt_client.loop_start()
 
-
 # Upload a media file (Local Storage)
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
@@ -68,7 +67,6 @@ async def upload_file(file: UploadFile = File(...)):
         print("MQTT client is not connected!")
 
     return {"message": "File uploaded successfully", "filename": file.filename}
-
 
 # Generate Pre-Signed URL for S3 Upload
 @app.get("/generate-presigned-url")
@@ -97,7 +95,6 @@ def list_files():
     files = os.listdir(UPLOAD_FOLDER)
     return {"files": files}
 
-
 # WebSocket for real-time updates
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -111,7 +108,6 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         clients.remove(websocket)  # Ensure client is removed when they disconnect
 
-
 # Download a media file (Local Storage)
 @app.get("/media/{filename}")
 def get_file(filename: str):
@@ -120,12 +116,10 @@ def get_file(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(file_path)
 
-
 # Health check endpoint
 @app.get("/")
 def read_root():
     return {"message": "Media Server is Running"}
-
 
 # Delete a file (Local Storage)
 @app.delete("/delete/{filename}")
@@ -142,7 +136,6 @@ def delete_file(filename: str):
 
     return {"message": "File deleted successfully", "filename": filename}
 
-
 # CORS Configuration (Allows communication with frontends like React, Flutter)
 app.add_middleware(
     CORSMiddleware,
@@ -151,7 +144,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 @app.get("/debug/routes")
 async def get_routes():

@@ -10,3 +10,4 @@ urllib3
 websockets
 python-multipart
 paho-mqtt
+python-dotenv
